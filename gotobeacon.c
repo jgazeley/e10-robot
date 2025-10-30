@@ -207,7 +207,7 @@ task main(){
 		motor[port3] = 0;  // arm motor off
 		wait1Msec(1000);
 		motor[port3] = -64; // reverse to raise arm
-		wait1Msec(2000);
+		wait1Msec(2000);   // <------ REPLACE WITH LIMIT SWITCH?
 		motor[port3] = 0;  // arm motor off
 
 		ReadPD();
@@ -217,7 +217,9 @@ task main(){
 			// back away from red beacon, then begin looking for green beacon
 			motor[port2] = -64;		// left motor reverse, half speed
 			motor[port10] = -64;	// right motor reverse, half speed
-			wait1Msec(2000);		// reverse for 2 seconds   <------ REPLACE WITH LIMIT SWITCH?
+			wait1Msec(2000);		// reverse for 2 seconds
+			stopDrive();
+
 			state = FIND_GREEN;
 		}
 	}
