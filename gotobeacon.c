@@ -25,25 +25,25 @@ typedef enum {
 State state;
 
 // beacon frequencies and motor speeds
-#define ONE_KILOHERTZ						0
-#define TEN_KILOHERTZ						1
-#define FULL_SPEED              127
+#define ONE_KILOHERTZ						0			// 0 = 1kHz (red)
+#define TEN_KILOHERTZ						1			// 1 = 10kHz (green)
+#define FULL_SPEED							127
 #define HALF_SPEED							64
 #define HALF_SPEED_REVERSE			-64
 #define ZERO_SPEED							0
 
 // prototypes
 void setBeaconFreq(int freq);
+int findBeacon(int targetFreq, State currentState, State nextState);
 void stopDrive();
 void reverseDrive();
 void lowerArm();
 void raiseArm();
-
 //*!!End GROUP 4 Specific Code                                                               !!*//
 
 
 // Global Variables
-int freq, ambient_level, slow_level, stop_level, expose_time, steer_sensitivity, forward_speed, slow_speed, spin_speed;
+int ambient_level, slow_level, stop_level, expose_time, steer_sensitivity, forward_speed, slow_speed, spin_speed;
 
 // initialize PD values for the global uses - will be modified at the appropriate timing in ReadPD function.
 int PD0, PD1, PD2, PD3, PD4, PD5, PD6, PD7, PD_sum;
@@ -179,21 +179,20 @@ task main(){
 //*!! GROUP 4 Main Code
 	state = FIND_RED;
 
-	// find the red beacon
-	freq = ONE_KILOHERTZ; // 0 = 1khz (red)
-	findBeacon(freq, FIND_RED, TURN_OFF_RED);
+	// find the red beacon (1kHz)
+	findBeacon(ONE_KILOHERTZ, FIND_RED, TURN_OFF_RED);
 
 	// turn off red beacon and then back away
 	while(state == TURN_OFF_RED) {
 		// turn off red beacon (activate arm motor, wait til arm makes contact)
 		lowerArm();
-		wait1Msec(1000);
+		wait1Msec(1000);			// pause for 1 second before raising arm
 		raiseArm();
 		ReadPD();
 
 		if (/*PD_sum is low*/) {	// <-------- need a real condition here
 
-			// back away from red beacon, then begin looking for green beacon
+			// back away from red beacon
 			reverseDrive();
 			wait1Msec(2000);		// reverse for 2 seconds
 			stopDrive();
@@ -202,9 +201,8 @@ task main(){
 		}
 	}
 
-	// find the green beacon
-	freq = TEN_KILOHERTZ; // 1 = 10khz (green)
-	findBeacon(freq, FIND_GREEN, CAPTURE_GREEN);
+	// find the green beacon (10kHz)
+	findBeacon(TEN_KILOHERTZ, FIND_GREEN, CAPTURE_GREEN);
 
 	// capture green beacon
 	while(state == CAPTURE_GREEN) {
@@ -225,7 +223,6 @@ task main(){
 
 
 
-
 //*!! GROUP 4 Helpers
 
 // set the beacon frequency
@@ -234,7 +231,7 @@ void setBeaconFreq(int freq) {        // 0 = 1kHz (red), 1 = 10kHz (green)
 }
 
 // find beacon sequence (same for red and green beacon)
-bool findBeacon(int targetFreq, State currentState, State nextState) {
+int findBeacon(int targetFreq, State currentState, State nextState) {
   setBeaconFreq(targetFreq);
 
   while (state == currentState) {
@@ -245,34 +242,34 @@ bool findBeacon(int targetFreq, State currentState, State nextState) {
     if (frontBumper) {
       stopDrive();
       state = nextState;
-      return true;
+      return 1;
     }
   }
-  return false; // state changed by someone else
+  return 0;
 }
 
 // stop drive motors
 void stopDrive() {
-  motor[port2]  = 0;
-  motor[port10] = 0;
+  motor[rightMotor]  = ZERO_SPEED;
+  motor[leftMotor] = ZERO_SPEED;
 }
 
 // reverse drive motors, half speed
 void reverseDrive() {
-  motor[port2]  = HALF_SPEED_REVERSE;
-  motor[port10] = HALF_SPEED_REVERSE;
+  motor[rightMotor]  = HALF_SPEED_REVERSE;
+  motor[leftMotor] = HALF_SPEED_REVERSE;
 }
 
 // lower the arm to press red beacon button OR capture green beacon
 void lowerArm() {
   motor[armMotor] = HALF_SPEED;
-  while(!armBumper) {}           // motor spins until arm contacts the top of red beacon
-  motor[armMotor] = ZERO_SPEED;  // arm motor off
+  while(!armBumper) {}           // motor spins until arm contacts the top of the beacon
+  motor[armMotor] = ZERO_SPEED;
 }
 
 // raise the arm after pressing red beacon button
 void raiseArm() {
   motor[armMotor] = HALF_SPEED_REVERSE; // reverse to raise arm
   wait1Msec(2000);   // <------ REPLACE WITH LIMIT SWITCH?
-  motor[armMotor] = ZERO_SPEED;  // arm motor off
+  motor[armMotor] = ZERO_SPEED;
 }
