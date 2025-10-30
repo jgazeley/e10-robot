@@ -159,6 +159,12 @@ void stopDrive() {
   motor[port10] = 0;
 }
 
+// stop drive motors
+void reverseDrive() {
+  motor[port2]  = -64;
+  motor[port10] = -64;
+}
+
 // find beacon sequence (same for red and green beacon)
 bool findBeacon(int targetFreq, State currentState, State nextState) {
   setBeaconFreq(targetFreq);
@@ -215,8 +221,7 @@ task main(){
 		if (/*PD_sum is low*/) {	// <-------- need a real condition here
 
 			// back away from red beacon, then begin looking for green beacon
-			motor[port2] = -64;		// left motor reverse, half speed
-			motor[port10] = -64;	// right motor reverse, half speed
+			reverseDrive();
 			wait1Msec(2000);		// reverse for 2 seconds
 			stopDrive();
 
