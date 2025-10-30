@@ -12,6 +12,7 @@
 #pragma config(Sensor, dgtl6, armBumper,			sensorTouch)  // limit switch to detect arm contact
 #pragma config(Motor, port3,						armMotor,		 tmotorVex393_HBridge, openLoop, reversed)
 
+// robot states
 typedef enum {
   FIND_RED 		= 1,
   TURN_OFF_RED 	= 2,
@@ -22,6 +23,21 @@ typedef enum {
 } State;
 
 State state;
+
+// beacon frequencies and motor speeds
+#define ONE_KILOHERTZ						0
+#define TEN_KILOHERTZ						1
+#define FULL_SPEED              127
+#define HALF_SPEED							64
+#define HALF_SPEED_REVERSE			-64
+#define ZERO_SPEED							0
+
+// prototypes
+void setBeaconFreq(int freq);
+void stopDrive();
+void reverseDrive();
+void lowerArm();
+
 //*!!End GROUP 4 Specific Code                                                               !!*//
 
 
@@ -146,23 +162,74 @@ void Move(){
 	motor[port10] = tempSpeed; // left, port	 10
 }
 
+/*
+The GOBEACON main program essentially sets up all the configuration variables and repeatedly
+execute the three routines: Read_PD, find_max, and move.*/
+task main(){
+	ambient_level = 200; // used in 'move'
+	slow_level = 5000;// used in move
+	stop_level = 6000;//used in move
+	expose_time = 5; // expose time was changed from 3ms to 5ms (3ms in easyC -> 5ms in RobotC)
+	steer_sensitivity = 20;//used in move
+	forward_speed = 35;//forward speed , used in move
+	slow_speed = 25;//slow speed , used in move
+	spin_speed = 30;//spin speed (for searching mode),used in move
+
+//*!! GROUP 4 Main Code
+	state = FIND_RED;
+
+	// find the red beacon
+	freq = ONE_KILOHERTZ; // 0 = 1khz (red)
+	findBeacon(freq, FIND_RED, TURN_OFF_RED);
+
+	// turn off red beacon and then back away
+	while(state == TURN_OFF_RED) {
+		// turn off red beacon (activate arm motor, wait til arm makes contact)
+		lowerArm();
+		wait1Msec(1000);
+		raiseArm();
+		ReadPD();
+
+		if (/*PD_sum is low*/) {	// <-------- need a real condition here
+
+			// back away from red beacon, then begin looking for green beacon
+			reverseDrive();
+			wait1Msec(2000);		// reverse for 2 seconds
+			stopDrive();
+
+			state = FIND_GREEN;
+		}
+	}
+
+	// find the green beacon
+	freq = TEN_KILOHERTZ; // 1 = 10khz (green)
+	findBeacon(freq, FIND_GREEN, CAPTURE_GREEN);
+
+	// capture green beacon
+	while(state == CAPTURE_GREEN) {
+
+		// grab green beacon (activate arm motor, wait til arm makes contact)
+		lowerArm();
+		state = EXIT_ARENA;
+	}
+
+	// exit the arena
+	while(state == EXIT_ARENA) {
+
+		// do stuff
+		
+		state = DONE;
+	}
+}
+
+
+
+
 //*!! GROUP 4 Helpers
 
 // set the beacon frequency
 void setBeaconFreq(int freq) {        // 0 = 1kHz (red), 1 = 10kHz (green)
   SensorValue[digital10] = freq;
-}
-
-// stop drive motors
-void stopDrive() {
-  motor[port2]  = 0;
-  motor[port10] = 0;
-}
-
-// stop drive motors
-void reverseDrive() {
-  motor[port2]  = -64;
-  motor[port10] = -64;
 }
 
 // find beacon sequence (same for red and green beacon)
@@ -183,73 +250,28 @@ bool findBeacon(int targetFreq, State currentState, State nextState) {
   return false; // state changed by someone else
 }
 
-/*
-The GOBEACON main program essentially sets up all the configuration variables and repeatedly
-execute the three routines: Read_PD, find_max, and move.*/
-task main(){
-	ambient_level = 200; // used in 'move'
-	slow_level = 5000;// used in move
-	stop_level = 6000;//used in move
-	expose_time = 5; // expose time was changed from 3ms to 5ms (3ms in easyC -> 5ms in RobotC)
-	steer_sensitivity = 20;//used in move
-	forward_speed = 35;//forward speed , used in move
-	slow_speed = 25;//slow speed , used in move
-	spin_speed = 30;//spin speed (for searching mode),used in move
+// stop drive motors
+void stopDrive() {
+  motor[port2]  = 0;
+  motor[port10] = 0;
+}
 
-//*!! GROUP 4 Main Code
-	state = FIND_RED;
+// reverse drive motors, half speed
+void reverseDrive() {
+  motor[port2]  = HALF_SPEED_REVERSE;
+  motor[port10] = HALF_SPEED_REVERSE;
+}
 
-	// find the red beacon
-	freq = 0; // 0 = 1khz (red)
-	findBeacon(freq, FIND_RED, TURN_OFF_RED);
+// lower the arm to press red beacon button OR capture green beacon
+void lowerArm() {
+  motor[armMotor] = HALF_SPEED;
+  while(!armBumper) {}           // motor spins until arm contacts the top of red beacon
+  motor[armMotor] = ZERO_SPEED;  // arm motor off
+}
 
-	// turn off red beacon and then back away
-	while(state == TURN_OFF_RED) {
-		// turn off red beacon (activate arm motor, wait til arm makes contact)
-		motor[port3] = 64; // half speed
-
-		while(!armBumper) {}   // motor spins until arm contacts the top of red beacon
-
-		motor[port3] = 0;  // arm motor off
-		wait1Msec(1000);
-		motor[port3] = -64; // reverse to raise arm
-		wait1Msec(2000);   // <------ REPLACE WITH LIMIT SWITCH?
-		motor[port3] = 0;  // arm motor off
-
-		ReadPD();
-
-		if (/*PD_sum is low*/) {	// <-------- need a real condition here
-
-			// back away from red beacon, then begin looking for green beacon
-			reverseDrive();
-			wait1Msec(2000);		// reverse for 2 seconds
-			stopDrive();
-
-			state = FIND_GREEN;
-		}
-	}
-
-	// find the green beacon
-	freq = 1; // 1 = 10khz (green)
-	findBeacon(freq, FIND_GREEN, CAPTURE_GREEN);
-
-	// capture green beacon
-	while(state == CAPTURE_GREEN) {
-
-		// grab green beacon (activate arm motor, wait til arm makes contact)
-		motor[port3] = 64; // half speed
-
-		while(!armBumper) {}   // motor spins until arm contacts the top of green beacon
-
-		motor[port3] = 0;  // arm motor off
-		state = EXIT_ARENA;
-	}
-
-	// exit the arena
-	while(state == EXIT_ARENA) {
-
-		// do stuff
-		
-		state = DONE;
-	}
+// raise the arm after pressing red beacon button
+void raiseArm() {
+  motor[armMotor] = HALF_SPEED_REVERSE; // reverse to raise arm
+  wait1Msec(2000);   // <------ REPLACE WITH LIMIT SWITCH?
+  motor[armMotor] = ZERO_SPEED;  // arm motor off
 }
