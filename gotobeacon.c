@@ -37,6 +37,7 @@ void setBeaconFreq(int freq);
 void stopDrive();
 void reverseDrive();
 void lowerArm();
+void raiseArm();
 
 //*!!End GROUP 4 Specific Code                                                               !!*//
 
