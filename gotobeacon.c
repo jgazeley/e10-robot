@@ -1,9 +1,7 @@
 #pragma config(Sensor, in1,    analog1,        sensorAnalog)
-#pragma config(Sensor, dgtl2,  ledRed,         sensorDigitalOut)
-#pragma config(Sensor, dgtl3,  ledGreen,       sensorDigitalOut)
-#pragma config(Sensor, dgtl4,  frontLimit,     sensorTouch)
-#pragma config(Sensor, dgtl6,  armLowBumper,   sensorTouch)
-#pragma config(Sensor, dgtl7,  armHiBumper,    sensorTouch)
+#pragma config(Sensor, dgtl1,  frontLimit,     sensorDigitalIn)
+#pragma config(Sensor, dgtl6,  armLowBumper,   sensorDigitalIn)
+#pragma config(Sensor, dgtl7,  armHiBumper,    sensorDigitalIn)
 #pragma config(Sensor, dgtl10, digital10,      sensorDigitalOut)
 #pragma config(Sensor, dgtl11, digital11,      sensorDigitalOut)
 #pragma config(Sensor, dgtl12, digital12,      sensorDigitalOut)
@@ -71,46 +69,51 @@ task main(){
 
 	// turn off red beacon and then back away
 	while(state == TURN_OFF_RED) {
-		// turn off red beacon (activate arm motor, wait til arm makes contact)
-		moveArm(ARM_LOWER);
-		delay(1000);			// pause for 1 second before raising arm
-		moveArm(ARM_RAISE);
-		ReadPD();
+		delay(1000);
+		//moveArm(ARM_LOWER);
+		//delay(5000);
+		//moveArm(ARM_RAISE);
+		//delay(5000);
+			motor[armMotor] = -64;
+			delay(3000);        // motor spins until arm contacts the top of the beacon
+			motor[armMotor] = 64;
+			motor[armMotor] = ZERO_SPEED;
 
-//		if (/*PD_sum is low*/) {	// <-------- TODO: need a real condition here
+		reverseDrive();
+		delay(2000);   // reverse for 2 seconds
+		stopDrive();
 
-			// back away from red beacon
-			reverseDrive();
-			delay(2000);		// reverse for 2 seconds
-			stopDrive();
-
-			SensorValue[ledRed] = 0;
-			SensorValue[ledGreen] = 1;
-			state = FIND_GREEN;
-//		}
+		state = FIND_GREEN;
 	}
+
+	// --- EVERYTHING BELOW THIS LINE WAS OUTSIDE main BEFORE ---
 
 	// find the green beacon (10kHz)
 	findBeacon(TEN_KILOHERTZ, FIND_GREEN, CAPTURE_GREEN);
 
 	// capture green beacon
 	while(state == CAPTURE_GREEN) {
-
-		// grab green beacon (activate arm motor, wait til arm makes contact)
-		moveArm(ARM_LOWER);
+		// Example: lower arm to grab, then set next state
+		//moveArm(ARM_LOWER);
+		delay(2000);
+		reverseDrive();
+		delay(10000);
 		state = EXIT_ARENA;
 	}
 
 	// exit the arena
-	while(state == EXIT_ARENA) {
+	//while(state == EXIT_ARENA) {
+	//	// TODO: drive forward until line/edge, etc.
+	//	moveArm(ARM_RAISE);
+	//	state = DONE;
+	//}
 
-		// TODO: leave the arena
-
-		// release green beacon once we know we have left the arena
-		moveArm(ARM_RAISE);
-		// celebration();
-		state = DONE;
-	}
+	// done
+	//while(state == DONE) {
+	//	stopDrive();
+	//	// optional celebration / hold
+	//	delay(20);
+	//}
 }
 
 //##############################*!! GROUP 4 Helpers !!*############################//
@@ -125,57 +128,59 @@ void robot_init() {
 	forward_speed = 35;//forward speed , used in move
 	slow_speed = 25;//slow speed , used in move
 	spin_speed = 30;//spin speed (for searching mode),used in move
-	SensorValue[ledRed] = 1;
-	SensorValue[ledGreen] = 0;
 	state = FIND_RED;
 }
 
 // set the beacon frequency
 void setBeaconFreq(int freq) {        // 0 = 1kHz (red), 1 = 10kHz (green)
-  SensorValue[digital10] = freq;
+	SensorValue[digital10] = freq;
 }
 
 // find beacon sequence (same for red and green beacon)
 int findBeacon(int targetFreq, int currentState, int nextState) {
-  setBeaconFreq(targetFreq);
+setBeaconFreq(targetFreq);
 
-  while (state == currentState) {
-    ReadPD();
-    Find_max();
-    Move();
+while (state == currentState) {
+	//ReadPD();
+	//Find_max();
+	//Move();
+	reverseDrive();
 
-    if (SensorValue[frontLimit]) {
-      stopDrive();
-      state = nextState;
-      return 1;
-    }
-  }
-  return 0;
+	// front limit switch pressed -> reached beacon
+	if (!SensorValue[frontLimit]) {
+		stopDrive();
+		state = nextState;   // advance the state machine
+		return 1;            // beacon found
+	}
 }
+
+return 0; // loop exited without finding the beacon
+}
+
 
 // stop drive motors
 void stopDrive() {
-  motor[rightMotor]  = ZERO_SPEED;
-  motor[leftMotor] = ZERO_SPEED;
+	motor[rightMotor]  = ZERO_SPEED;
+	motor[leftMotor] = ZERO_SPEED;
 }
 
 // reverse drive motors, half speed
 void reverseDrive() {
-  motor[rightMotor]  = HALF_SPEED_REVERSE;
-  motor[leftMotor] = HALF_SPEED_REVERSE;
+	motor[rightMotor]  = HALF_SPEED_REVERSE;
+	motor[leftMotor] = HALF_SPEED_REVERSE;
 }
 
 // move the arm up or down
 void moveArm(int direction) {
 	if (direction == ARM_LOWER) {
-	  motor[armMotor] = HALF_SPEED;
-	  while(!SensorValue[armLowBumper]) {}        // motor spins until arm contacts the top of the beacon
-	  motor[armMotor] = ZERO_SPEED;
+		motor[armMotor] = HALF_SPEED;
+		while(!SensorValue[armLowBumper]) {}        // motor spins until arm contacts the top of the beacon
+		motor[armMotor] = ZERO_SPEED;
 	}
 	else if (direction == ARM_RAISE) {
-	  motor[armMotor] = HALF_SPEED_REVERSE; 			// reverse to raise arm
-	  while(!SensorValue[armHiBumper]) {}         // motor spins until arm contacts the top of the beacon
-	  motor[armMotor] = ZERO_SPEED;
+		motor[armMotor] = HALF_SPEED_REVERSE; 			// reverse to raise arm
+		while(!SensorValue[armHiBumper]) {}         // motor spins until arm contacts the top of the beacon
+		motor[armMotor] = ZERO_SPEED;
 	}
 }
 
@@ -286,9 +291,9 @@ int limit_pwm(int temp){
 
 	if(temp > 127){
 		limited = 127;
-	} else if (temp < -127){
+		} else if (temp < -127){
 		limited = -127;
-	} else{
+		} else{
 		limited = temp;
 	}
 
