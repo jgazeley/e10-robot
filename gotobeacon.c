@@ -215,8 +215,8 @@ task main() {
                 setBaudRate(uartOne, baudRate9600);
 
                 // ---- TUNING ----
-                const int EXIT_DIST_CM  = 400;  // "ideal" exit distance, 12 ft ~ 365 cm
-                const int STOP_NEAR_CM  = 25;   // Safety stop distance
+                const int EXIT_DIST_CM  = 400;  // "ideal" exit distance, Default: 12 ft ~ 365 cm
+                const int STOP_NEAR_CM  = 32;   // Safety stop distance
                 const int DRIVE_PWM_FWD = 127;  // Forward drive speed
                 const int SPIN_PWM_SLOW = 64;   // Smooth spin speed
                 const int BACK_UP_MS    = 750;  // How long to back up
@@ -353,7 +353,7 @@ task main() {
                 // Nudge left: small pivot away from the right wall
                 motor[rightMotor] =  -SPIN_PWM_SLOW;   // same as you already had
                 motor[leftMotor]  =  -SPIN_PWM_SLOW;
-                wait1Msec(500);                        // tweak this duration as needed
+                wait1Msec(200);                        // tweak this duration as needed
                 stop_drive();
 
                 // Debounce
@@ -372,7 +372,7 @@ task main() {
                 // Nudge right: pivot opposite way of the right bumper
                 motor[rightMotor] =  SPIN_PWM_SLOW;
                 motor[leftMotor]  =  SPIN_PWM_SLOW;
-                wait1Msec(500);                        // tweak as needed
+                wait1Msec(200);                        // tweak as needed
                 stop_drive();
 
                 // Debounce
@@ -410,6 +410,9 @@ task main() {
 
                 stop_drive();
                 move_arm(ARM_RAISE, 0);
+                reverse_drive();
+                delay(200);
+                stop_drive();
                 is_first_run = true; // Reset for next time
                 state = DONE; // Finish
             } break;
